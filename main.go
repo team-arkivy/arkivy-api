@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 
@@ -20,6 +21,8 @@ func main() {
 	if port == "" {
 		port = "3000"
 	}
+
+	fmt.Printf("Servidor corriendo en el puerto %s\n", port)
 
 	_ = r.Run(":" + port)
 }
