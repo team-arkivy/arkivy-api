@@ -12,42 +12,28 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 
 	"arkivy-api/Internal/arkivy/test1"
+	"arkivy-api/config"
 )
 
 var (
-	mongoClient *mongo.Client
 	oauthConfig *oauth2.Config
 	userHandler *test1.UserHandler
 )
 
 func main() {
-	// 1. Cargar configuración
-	if err := godotenv.Load(); err != nil {
-		log.Println("Aviso: No se encontró archivo .env, usando variables de entorno del sistema")
-	}
+	// 1. Cargar variables de entorno desde .env
+	config.LoadEnv()
 
-	mongoURI := os.Getenv("MONGO_URI")
-	if mongoURI == "" {
-		mongoURI = "mongodb://localhost:27017"
-	}
-
-	// 2. Configurar conexión a MongoDB
-	connectToMongo(mongoURI)
-	defer func() {
-		if err := mongoClient.Disconnect(context.Background()); err != nil {
-			log.Fatal(err)
-		}
-	}()
+	// 2. Conectar a MongoDB
+	config.ConnectMongo()
+	defer config.DisconnectMongo()
 
 	// Inicializar la base de datos "arkivy" y el módulo de Clean Architecture
-	db := mongoClient.Database("arkivy")
+	db := config.DB.Database("arkivy")
 	userModule := test1.InitUserModule(db)
 	userHandler = userModule.Handler
 
@@ -104,7 +90,7 @@ func main() {
 		}
 	}
 
-	// Iniciar servidor
+	// 5. Iniciar servidor
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -116,29 +102,8 @@ func main() {
 	}
 }
 
-func connectToMongo(uri string) {
-	var err error
-
-	// Crear cliente y conectarse al servidor
-	opts := options.Client().ApplyURI(uri)
-	mongoClient, err = mongo.Connect(opts)
-	if err != nil {
-		log.Fatal("Error al crear cliente MongoDB:", err)
-	}
-
-	// Hacer ping para confirmar que la conexión funciona
-	err = mongoClient.Ping(context.Background(), nil)
-	if err != nil {
-		log.Fatal("Error al hacer ping a MongoDB:", err)
-	}
-
-	fmt.Println("Conectado exitosamente a MongoDB Compass!")
-}
-
 // Genera la URL de Google y redirige al usuario
 func handleGoogleLogin(c *gin.Context) {
-	// state debería ser un valor aleatorio generado por sesión para evitar ataques CSRF.
-	// Para este ejemplo usamos un string fijo.
 	state := "estado-aleatorio-para-seguridad"
 	url := oauthConfig.AuthCodeURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, url)
