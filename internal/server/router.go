@@ -1,6 +1,7 @@
 package server
 
 import (
+	"arkivy-api/internal/arkivy/game"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -33,14 +34,16 @@ func registerRoutes(r *gin.Engine, db *mongo.Database) {
 // registerPublicRoutes agrupa las rutas que no requieren autenticación.
 func registerPublicRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 	// Ejemplo: módulo test1
-	userModule := test1.InitUserModule(db)
-	users := rg.Group("/users")
+	test1Module := test1.InitUserModule(db)
+	testing := rg.Group("/testing")
 	{
-		_ = users
-		_ = userModule
+		_ = testing
+		_ = test1Module
 		// TODO: montar handlers de test1 aquí
-		// users.POST("/login", userModule.Handler.Login)
+		// testing.POST("/login", test1Module.Handler.Login)
 	}
+	// Example test
+	game.RegisterRoutes(rg, db)
 }
 
 // registerProtectedRoutes agrupa las rutas que requieren token válido de Zitadel.
