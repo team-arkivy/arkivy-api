@@ -5,7 +5,6 @@ import "go.mongodb.org/mongo-driver/v2/mongo"
 // Resources contiene las dependencias instanciadas necesarias por el sistema de usuarios
 type Resources struct {
 	Handler *UserHandler
-	UseCase UserUseCase
 }
 
 // InitUserModule actúa como un contendor de inyección de dependencias
