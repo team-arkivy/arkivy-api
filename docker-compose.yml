@@ -1,0 +1,24 @@
+version: '3.9'
+
+services:
+
+  app:
+    build: .
+    ports:
+      - "9090:9090"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/arkivy
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:8.0        # most resent version
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: arkivy
+    volumes:
+      - mongo_data:/data/db  # data persist even if the container go down
+
+volumes:
+  mongo_data:
