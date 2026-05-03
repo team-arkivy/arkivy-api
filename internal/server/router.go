@@ -4,10 +4,13 @@ import (
 	"arkivy-api/internal/arkivy/game"
 	"net/http"
 
+	_ "arkivy-api/docs"
+
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
-	"arkivy-api/internal/arkivy/test1"
 	"arkivy-api/internal/middleware"
 )
 
@@ -16,6 +19,9 @@ func registerRoutes(r *gin.Engine, db *mongo.Database) {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// Swagger UI
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// ─── API v1 ───────────────────────────────────────────────────────────────
 	v1_0 := r.Group("/arkivy/v1.0")
@@ -33,12 +39,9 @@ func registerRoutes(r *gin.Engine, db *mongo.Database) {
 
 // registerPublicRoutes agrupa las rutas que no requieren autenticación.
 func registerPublicRoutes(rg *gin.RouterGroup, db *mongo.Database) {
-	// Ejemplo: módulo test1
-	test1Module := test1.InitUserModule(db)
 	testing := rg.Group("/testing")
 	{
 		_ = testing
-		_ = test1Module
 		// TODO: montar handlers de test1 aquí
 		// testing.POST("/login", test1Module.Handler.Login)
 	}

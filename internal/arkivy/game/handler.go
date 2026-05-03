@@ -14,11 +14,18 @@ func newHandler(svc GameService) *handler {
 	return &handler{service: svc}
 }
 
+// @Summary      Crear un juego
+// @Description  Crea un nuevo juego en la base de datos
+// @Tags         games
+// @Accept       json
+// @Produce      json
+// @Param        body  body      CreateGameRequest  true  "Datos del juego"
+// @Success      201   {object}  Game
+// @Failure      400   {object}  map[string]string
+// @Failure      500   {object}  map[string]string
+// @Router       /games [post]
 func (h *handler) create(c *gin.Context) {
-	var body struct {
-		Name   string `json:"name" binding:"required"`
-		Amount int    `json:"amount" binding:"min=0"`
-	}
+	var body CreateGameRequest
 
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -34,6 +41,13 @@ func (h *handler) create(c *gin.Context) {
 	c.JSON(http.StatusCreated, game)
 }
 
+// @Summary      Listar juegos
+// @Description  Retorna todos los juegos disponibles
+// @Tags         games
+// @Produce      json
+// @Success      200  {array}   Game
+// @Failure      500  {object}  map[string]string
+// @Router       /games [get]
 func (h *handler) list(c *gin.Context) {
 	games, err := h.service.ListGames()
 	if err != nil {
