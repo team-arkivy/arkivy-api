@@ -53,6 +53,9 @@ _testmain.go
 ## Directory-based project format:
 .idea/
 
+# swagger docs
+docs
+
 ## File-based project format:
 *.ipr
 *.iws
