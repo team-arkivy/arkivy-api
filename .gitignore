@@ -88,3 +88,9 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Zitadel Service Account Key
+internal/middleware/key.json
+
+# variables de ambiente
+.env

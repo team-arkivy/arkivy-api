@@ -1,21 +1,31 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/zitadel/zitadel-go/v3/pkg/authorization"
+	"github.com/zitadel/zitadel-go/v3/pkg/authorization/oauth"
+	"github.com/zitadel/zitadel-go/v3/pkg/zitadel"
 )
 
+var authz *authorization.Authorizer[*oauth.IntrospectionContext]
+
+// InitAuth inicializa el cliente de Zitadel.
+// Llamar una sola vez al arrancar el servidor.
+func InitAuth(domain string) error {
+	var err error
+	authz, err = authorization.New(
+		context.Background(),
+		zitadel.New(domain),
+		oauth.DefaultAuthorization("key.json"),
+	)
+	return err
+}
+
 // AuthMiddleware valida tokens JWT emitidos por Zitadel.
-//
-// Por ahora es un placeholder estructurado listo para conectar con el
-// introspection endpoint de Zitadel o validación local con JWKS.
-//
-// Cuando se integre Zitadel, aquí va:
-//   - Obtener JWKS desde: https://<ZITADEL_DOMAIN>/oauth/v2/keys
-//   - Validar firma, expiración y claims (iss, aud, sub)
-//   - Inyectar el sub (userID) en el contexto de Gin
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -32,16 +42,13 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		token := parts[1]
 
-		// TODO: validar token con Zitadel JWKS cuando se configure
-		// Por ahora solo verifica que no esté vacío
-		if token == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token vacío"})
+		ctx, err := authz.CheckAuthorization(c.Request.Context(), token)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Token inválido"})
 			return
 		}
 
-		// Cuando Zitadel esté integrado, inyectar el userID así:
-		// c.Set("userID", claims.Subject)
-
+		c.Set("userID", ctx.UserID())
 		c.Next()
 	}
 }
