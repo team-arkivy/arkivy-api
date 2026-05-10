@@ -90,7 +90,7 @@ Temporary Items
 .apdisk
 
 # Zitadel Service Account Key
-internal/middleware/key.json
+key.json
 
 # variables de ambiente
 .env

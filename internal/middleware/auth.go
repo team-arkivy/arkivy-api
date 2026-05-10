@@ -15,12 +15,12 @@ var authz *authorization.Authorizer[*oauth.IntrospectionContext]
 
 // InitAuth inicializa el cliente de Zitadel.
 // Llamar una sola vez al arrancar el servidor.
-func InitAuth(domain string) error {
+func InitAuth(domain, keyPath string) error {
 	var err error
 	authz, err = authorization.New(
 		context.Background(),
 		zitadel.New(domain),
-		oauth.DefaultAuthorization("key.json"),
+		oauth.DefaultAuthorization(keyPath),
 	)
 	return err
 }

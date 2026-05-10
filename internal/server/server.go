@@ -20,7 +20,7 @@ type Server struct {
 
 func New(cfg *config.Config, client *mongo.Client) *Server {
 	// Inicializar Zitadel
-	if err := middleware.InitAuth(cfg.ZitadelDomain); err != nil {
+	if err := middleware.InitAuth(cfg.ZitadelDomain, cfg.ZitadelKeyPath); err != nil {
 		log.Fatalf("Error inicializando Zitadel: %v", err)
 	}
 
