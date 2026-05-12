@@ -8,6 +8,10 @@ services:
       - "9090:9090"
     environment:
       - MONGO_URI=mongodb://mongo:27017/arkivy
+      - ZITADEL_KEY_PATH=/app/key.json
+      - ZITADEL_DOMAIN=${ZITADEL_DOMAIN}
+    volumes:
+      - ./key.json:/app/key.json:ro
     depends_on:
       - mongo
 

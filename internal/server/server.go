@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -9,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	"arkivy-api/internal/config"
+	"arkivy-api/internal/middleware"
 )
 
 type Server struct {
@@ -17,13 +19,16 @@ type Server struct {
 }
 
 func New(cfg *config.Config, client *mongo.Client) *Server {
+	// Inicializar Zitadel
+	if err := middleware.InitAuth(cfg.ZitadelDomain, cfg.ZitadelKeyPath); err != nil {
+		log.Fatalf("Error inicializando Zitadel: %v", err)
+	}
+
 	r := gin.New()
 
-	// Logger y recovery controlados (en lugar de gin.Default())
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
-	// CORS
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     cfg.AllowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -33,7 +38,6 @@ func New(cfg *config.Config, client *mongo.Client) *Server {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	// Registrar todas las rutas
 	db := client.Database(cfg.MongoDB)
 	registerRoutes(r, db)
 
