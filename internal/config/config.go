@@ -18,10 +18,17 @@ type Config struct {
 	// CORS
 	AllowedOrigins []string
 
-	// Zitadel (JWT/OIDC)
-	ZitadelDomain   string
-	ZitadelClientID string
-	ZitadelKeyPath  string
+	// Zitadel
+	ZitadelDomain       string // https://dev-arkivy-ybl40k.us1.zitadel.cloud
+	ZitadelClientID     string
+	ZitadelKeyPath      string
+	ZitadelServiceToken string // PAT del service account
+	ZitadelProjectID    string
+	ZitadelGoogleIDP    string // ID del IDP de Google en Zitadel (opcional)
+	ZitadelGitHubIDP    string // ID del IDP de GitHub en Zitadel (opcional)
+
+	// Frontend
+	FrontendURL string
 }
 
 func Load() *Config {
@@ -30,13 +37,18 @@ func Load() *Config {
 	}
 
 	return &Config{
-		Port:            getEnv("PORT", "9090"),
-		MongoURI:        getEnv("MONGO_URI", "mongodb://localhost:27017"),
-		MongoDB:         getEnv("MONGO_DB", "arkivy"),
-		AllowedOrigins:  []string{getEnv("FRONTEND_URL", "http://localhost:4200")},
-		ZitadelDomain:   getEnv("ZITADEL_DOMAIN", ""),
-		ZitadelClientID: getEnv("ZITADEL_CLIENT_ID", ""),
-		ZitadelKeyPath:  getEnv("ZITADEL_KEY_PATH", "key.json"),
+		Port:                getEnv("PORT", "9090"),
+		MongoURI:            getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		MongoDB:             getEnv("MONGO_DB", "arkivy"),
+		AllowedOrigins:      []string{getEnv("FRONTEND_URL", "http://localhost:4200")},
+		ZitadelDomain:       getEnv("ZITADEL_DOMAIN", ""),
+		ZitadelClientID:     getEnv("ZITADEL_CLIENT_ID", ""),
+		ZitadelKeyPath:      getEnv("ZITADEL_KEY_PATH", "key.json"),
+		ZitadelServiceToken: getEnv("ZITADEL_SERVICE_TOKEN", ""),
+		ZitadelProjectID:    getEnv("ZITADEL_PROJECT_ID", ""),
+		ZitadelGoogleIDP:    getEnv("ZITADEL_GOOGLE_IDP", ""),
+		ZitadelGitHubIDP:    getEnv("ZITADEL_GITHUB_IDP", ""),
+		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:4200"),
 	}
 }
 
