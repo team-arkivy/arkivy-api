@@ -53,6 +53,9 @@ _testmain.go
 ## Directory-based project format:
 .idea/
 
+# swagger docs
+docs
+
 ## File-based project format:
 *.ipr
 *.iws
@@ -85,3 +88,9 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Zitadel Service Account Key
+key.json
+
+# variables de ambiente
+.env

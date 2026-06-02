@@ -1,0 +1,35 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    container_name: arkivy-api
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    env_file:
+      - .env
+    volumes:
+      - ./.env:/app/.env
+    depends_on:
+      - mongo
+    networks:
+      - arkivy-net
+
+  mongo:
+    image: mongo:7
+    container_name: arkivy-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - arkivy-net
+
+volumes:
+  mongo-data:
+
+networks:
+  arkivy-net:
+    driver: bridge
