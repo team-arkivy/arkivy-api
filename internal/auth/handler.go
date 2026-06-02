@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 
 	"arkivy-api/internal/zitadel"
@@ -33,27 +34,29 @@ func NewHandler(zClient *zitadel.Client, db *mongo.Database, googleIDP, githubID
 // syncSysAdminRole verifica si el usuario está en la colección sys_admins
 // y sincroniza el rol en Zitadel
 func (h *Handler) syncSysAdminRole(ctx context.Context, userID, loginName string) {
-	// Checar si el email está en la colección sys_admins
 	isSysAdmin := h.db.Collection("sys_admins").
 		FindOne(ctx, bson.M{"email": loginName}).Err() == nil
 
-	// Obtener roles actuales
 	currentRoles, err := h.zClient.GetUserRoles(ctx, userID)
 	if err != nil {
 		return
 	}
 
-	hasSysAdminRole := contains(currentRoles, "sys-admin")
+	if len(currentRoles) == 0 {
+		if err := h.zClient.AssignRole(ctx, userID, zitadel.RoleInvited); err != nil {
+			fmt.Printf("Error asignando rol invited a %s: %v\n", loginName, err)
+			return
+		}
+		currentRoles = []string{string(zitadel.RoleInvited)}
+	}
+
+	hasSysAdminRole := contains(currentRoles, string(zitadel.RoleSysAdmin))
 
 	if isSysAdmin && !hasSysAdminRole {
-		// Está en la tabla segura pero no tiene el rol → asignar
-		if err := h.zClient.AssignRole(ctx, userID, "sys-admin"); err != nil {
+		if err := h.zClient.AssignRole(ctx, userID, zitadel.RoleSysAdmin); err != nil {
 			fmt.Printf("Error asignando sys-admin a %s: %v\n", loginName, err)
 		}
 	}
-	// Nota: no quitamos el rol automáticamente por seguridad.
-	// Si quieres también remover el rol cuando no esté en la tabla,
-	// implementa RemoveRole en el client de Zitadel.
 }
 
 func contains(slice []string, item string) bool {
@@ -65,13 +68,13 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// Login maneja POST /auth/login
+// Login maneja POST /auth/login — solo devuelve credenciales de sesión
 // @Summary Login con email/password
 // @Tags Auth
 // @Accept json
 // @Produce json
 // @Param body body zitadel.LoginRequest true "Credenciales"
-// @Success 200 {object} zitadel.SessionResponse
+// @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Router /auth/login [post]
@@ -84,37 +87,30 @@ func (h *Handler) Login(c *gin.Context) {
 
 	session, err := h.zClient.Login(c.Request.Context(), req.LoginName, req.Password)
 	if err != nil {
+		log.Printf("[Login] error de Zitadel para %s: %v", req.LoginName, err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales inválidas"})
 		return
 	}
 
-	// Sincronizar rol sys-admin si aplica
+	// Sincronizar rol sys-admin si aplica (en background, no bloquea la respuesta)
 	if session.UserID != "" {
 		h.syncSysAdminRole(c.Request.Context(), session.UserID, session.LoginName)
 	}
 
-	// Obtener roles para incluirlos en la respuesta
-	roles, _ := h.zClient.GetUserRoles(c.Request.Context(), session.UserID)
-
 	c.JSON(http.StatusOK, gin.H{
 		"sessionId":    session.SessionID,
 		"sessionToken": session.SessionToken,
-		"userId":       session.UserID,
-		"displayName":  session.DisplayName,
-		"loginName":    session.LoginName,
-		"roles":        roles,
 	})
 }
 
-// Register maneja POST /auth/register
+// Register maneja POST /auth/register — crea usuario y devuelve credenciales de sesión
 // @Summary Registrar nuevo usuario
 // @Tags Auth
 // @Accept json
 // @Produce json
 // @Param body body zitadel.RegisterRequest true "Datos de registro"
-// @Success 201 {object} zitadel.SessionResponse
+// @Success 201 {object} map[string]string
 // @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
 // @Router /auth/register [post]
 func (h *Handler) Register(c *gin.Context) {
 	var req zitadel.RegisterRequest
@@ -134,16 +130,9 @@ func (h *Handler) Register(c *gin.Context) {
 		h.syncSysAdminRole(c.Request.Context(), userID, req.Username)
 	}
 
-	// Obtener roles actualizados
-	roles, _ := h.zClient.GetUserRoles(c.Request.Context(), userID)
-
 	c.JSON(http.StatusCreated, gin.H{
 		"sessionId":    session.SessionID,
 		"sessionToken": session.SessionToken,
-		"userId":       userID,
-		"displayName":  session.DisplayName,
-		"loginName":    session.LoginName,
-		"roles":        roles,
 	})
 }
 
@@ -173,10 +162,12 @@ func (h *Handler) Logout(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Sesión cerrada"})
 }
 
-// Me maneja GET /auth/me — devuelve info de la sesión actual
+// Me maneja GET /auth/me — devuelve info completa del usuario
 // @Summary Información del usuario actual
 // @Tags Auth
 // @Produce json
+// @Param X-Session-Id header string true "Session ID"
+// @Param X-Session-Token header string true "Session Token"
 // @Success 200 {object} map[string]any
 // @Failure 401 {object} map[string]string
 // @Router /auth/me [get]
@@ -191,7 +182,12 @@ func (h *Handler) Me(c *gin.Context) {
 
 	info, err := h.zClient.GetSession(c.Request.Context(), sessionID, sessionToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesión inválida"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesión inválida o expirada"})
+		return
+	}
+
+	if info.UserID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesión sin usuario verificado"})
 		return
 	}
 
@@ -206,7 +202,7 @@ func (h *Handler) Me(c *gin.Context) {
 	})
 }
 
-// GoogleLogin maneja GET /auth/google — redirige a Google
+// GoogleLogin maneja GET /auth/google
 // @Summary Iniciar login con Google
 // @Tags Auth
 // @Produce json
@@ -229,7 +225,7 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"authUrl": authURL})
 }
 
-// GitHubLogin maneja GET /auth/github — redirige a GitHub
+// GitHubLogin maneja GET /auth/github
 // @Summary Iniciar login con GitHub
 // @Tags Auth
 // @Produce json
@@ -252,7 +248,7 @@ func (h *Handler) GitHubLogin(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"authUrl": authURL})
 }
 
-// IDPCallback maneja POST /auth/idp/callback — procesa el callback de un IDP externo
+// IDPCallback maneja POST /auth/idp/callback
 // @Summary Callback de IDP (Google/GitHub)
 // @Tags Auth
 // @Accept json
@@ -285,15 +281,8 @@ func (h *Handler) IDPCallback(c *gin.Context) {
 		h.syncSysAdminRole(c.Request.Context(), session.UserID, session.LoginName)
 	}
 
-	// Obtener roles
-	roles, _ := h.zClient.GetUserRoles(c.Request.Context(), session.UserID)
-
 	c.JSON(http.StatusOK, gin.H{
 		"sessionId":    session.SessionID,
 		"sessionToken": session.SessionToken,
-		"userId":       session.UserID,
-		"displayName":  session.DisplayName,
-		"loginName":    session.LoginName,
-		"roles":        roles,
 	})
 }

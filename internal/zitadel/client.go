@@ -147,9 +147,8 @@ func (c *Client) Register(ctx context.Context, username, password string) (*Sess
 		},
 		"email": map[string]any{
 			"email": username,
-			"verification": map[string]any{
-				"sendCode": map[string]any{},
-			},
+			// Cambiar para cuando la verficación por email este listo
+			"isVerified": true,
 		},
 		"password": map[string]any{
 			"password":       password,
@@ -167,10 +166,10 @@ func (c *Client) Register(ctx context.Context, username, password string) (*Sess
 		return nil, "", fmt.Errorf("userId no encontrado en respuesta")
 	}
 
-	// Paso 2: Asignar rol "invitado" por defecto
-	if err := c.AssignRole(ctx, userID, "invitado"); err != nil {
+	// Paso 2: Asignar rol por defecto
+	if err := c.AssignRole(ctx, userID, RoleInvited); err != nil {
 		// No es fatal — el usuario se creó, solo no tiene rol aún
-		fmt.Printf("Aviso: no se pudo asignar rol invitado al usuario %s: %v\n", userID, err)
+		fmt.Printf("Aviso: no se pudo asignar rol invited al usuario %s: %v\n", userID, err)
 	}
 
 	// Paso 3: Crear sesión automáticamente
@@ -226,11 +225,10 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID, sessionToken stri
 }
 
 // AssignRole asigna un rol del proyecto a un usuario
-func (c *Client) AssignRole(ctx context.Context, userID, role string) error {
+func (c *Client) AssignRole(ctx context.Context, userID string, role Role) error {
 	body := map[string]any{
-		"userId":    userID,
 		"projectId": c.projectID,
-		"roleKeys":  []string{role},
+		"roleKeys":  []string{string(role)},
 	}
 	_, err := c.doRequest(ctx, "POST", "/management/v1/users/"+userID+"/grants", body)
 	return err
@@ -258,7 +256,7 @@ func (c *Client) GetUserRoles(ctx context.Context, userID string) ([]string, err
 		return nil, err
 	}
 
-	var roles []string
+	roles := []string{}
 	if result, ok := resp["result"].([]any); ok {
 		for _, item := range result {
 			if grant, ok := item.(map[string]any); ok {
