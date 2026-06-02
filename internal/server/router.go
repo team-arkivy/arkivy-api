@@ -2,6 +2,8 @@ package server
 
 import (
 	"arkivy-api/internal/arkivy/game"
+	"arkivy-api/internal/auth"
+	"arkivy-api/internal/zitadel"
 	"net/http"
 
 	_ "arkivy-api/docs"
@@ -14,7 +16,7 @@ import (
 	"arkivy-api/internal/middleware"
 )
 
-func registerRoutes(r *gin.Engine, db *mongo.Database) {
+func registerRoutes(r *gin.Engine, db *mongo.Database, zClient *zitadel.Client, authHandler *auth.Handler) {
 	// Health check global
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -26,14 +28,32 @@ func registerRoutes(r *gin.Engine, db *mongo.Database) {
 	// ─── API v1 ───────────────────────────────────────────────────────────────
 	v1_0 := r.Group("/arkivy/v1.0")
 	{
-		// Rutas públicas (sin autenticación)
+		// ─── Rutas de autenticación (públicas) ────────────────────────────
+		authGroup := v1_0.Group("/auth")
+		{
+			authGroup.POST("/login", authHandler.Login)
+			authGroup.POST("/register", authHandler.Register)
+			authGroup.POST("/logout", authHandler.Logout)
+			authGroup.GET("/me", authHandler.Me)
+			authGroup.GET("/google", authHandler.GoogleLogin)
+			authGroup.GET("/github", authHandler.GitHubLogin)
+			authGroup.POST("/idp/callback", authHandler.IDPCallback)
+		}
+
+		// ─── Rutas públicas (sin autenticación) ───────────────────────────
 		public := v1_0.Group("")
 		registerPublicRoutes(public, db)
 
-		// Rutas protegidas (requieren JWT de Zitadel)
+		// ─── Rutas protegidas (requieren sesión válida) ───────────────────
 		protected := v1_0.Group("")
-		protected.Use(middleware.AuthMiddleware())
+		protected.Use(middleware.SessionMiddleware(zClient))
 		registerProtectedRoutes(protected, db)
+
+		// ─── Rutas solo admin ─────────────────────────────────────────────
+		admin := v1_0.Group("/admin")
+		admin.Use(middleware.SessionMiddleware(zClient))
+		admin.Use(middleware.RequireRole("sys-admin", "plat-admin"))
+		registerAdminRoutes(admin, db)
 	}
 }
 
@@ -42,18 +62,18 @@ func registerPublicRoutes(rg *gin.RouterGroup, db *mongo.Database) {
 	testing := rg.Group("/testing")
 	{
 		_ = testing
-		// TODO: montar handlers de test1 aquí
-		// testing.POST("/login", test1Module.Handler.Login)
 	}
-	// Example test
 	game.RegisterRoutes(rg, db)
 }
 
-// registerProtectedRoutes agrupa las rutas que requieren token válido de Zitadel.
+// registerProtectedRoutes agrupa las rutas que requieren sesión válida.
 func registerProtectedRoutes(rg *gin.RouterGroup, db *mongo.Database) {
-	// TODO: agregar rutas protegidas aquí a medida que crezca el proyecto
-	// Ejemplo:
-	// files := rg.Group("/files")
-	// files.GET("", fileModule.Handler.List)
+	// TODO: agregar rutas protegidas aquí
+	_ = db
+}
+
+// registerAdminRoutes agrupa las rutas que requieren rol admin.
+func registerAdminRoutes(rg *gin.RouterGroup, db *mongo.Database) {
+	// TODO: agregar rutas de admin aquí
 	_ = db
 }

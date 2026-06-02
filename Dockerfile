@@ -1,23 +1,31 @@
-# ---- Step 1: compile ----
+# Build stage
 FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependencies and start
+# Copiar go.mod y go.sum primero para cachear dependencias
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copiar the rest of the code and compile
+# Copiar el resto del código
 COPY . .
-RUN go build -o main ./cmd/main.go
 
-# ---- Step 2: final light image ----
-FROM alpine:latest
+# Compilar binario estático
+RUN CGO_ENABLED=0 GOOS=linux go build -o /app/arkivy-api ./cmd/main.go
+
+# Runtime stage
+FROM alpine:3.20
+
+RUN apk --no-cache add ca-certificates tzdata
 
 WORKDIR /app
 
-COPY --from=builder /app/main .
+# Copiar binario
+COPY --from=builder /app/arkivy-api .
+
+# Copiar key.json si existe (para Zitadel service account)
+COPY key.json* ./
 
 EXPOSE 9090
 
-CMD ["./main"]
+CMD ["./arkivy-api"]

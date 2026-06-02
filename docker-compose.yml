@@ -1,28 +1,35 @@
-version: '3.9'
+version: "3.8"
 
 services:
-
-  app:
+  api:
     build: .
+    container_name: arkivy-api
+    restart: unless-stopped
     ports:
       - "9090:9090"
-    environment:
-      - MONGO_URI=mongodb://mongo:27017/arkivy
-      - ZITADEL_KEY_PATH=/app/key.json
-      - ZITADEL_DOMAIN=${ZITADEL_DOMAIN}
+    env_file:
+      - .env
     volumes:
-      - ./key.json:/app/key.json:ro
+      - ./.env:/app/.env
     depends_on:
       - mongo
+    networks:
+      - arkivy-net
 
   mongo:
-    image: mongo:8.0        # most resent version
+    image: mongo:7
+    container_name: arkivy-mongo
+    restart: unless-stopped
     ports:
       - "27017:27017"
-    environment:
-      MONGO_INITDB_DATABASE: arkivy
     volumes:
-      - mongo_data:/data/db  # data persist even if the container go down
+      - mongo-data:/data/db
+    networks:
+      - arkivy-net
 
 volumes:
-  mongo_data:
+  mongo-data:
+
+networks:
+  arkivy-net:
+    driver: bridge
