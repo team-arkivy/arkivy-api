@@ -94,3 +94,6 @@ key.json
 
 # variables de ambiente
 .env
+
+# Air hot-reload temp directory
+tmp/

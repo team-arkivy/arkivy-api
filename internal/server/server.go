@@ -22,14 +22,14 @@ type Server struct {
 func New(cfg *config.Config, client *mongo.Client) *Server {
 	db := client.Database(cfg.MongoDB)
 
-	// Inicializar cliente de Zitadel
+	// Initialize Zitadel client
 	zClient := zitadel.NewClient(
 		cfg.ZitadelDomain,
 		cfg.ZitadelServiceToken,
 		cfg.ZitadelProjectID,
 	)
 
-	// Inicializar handler de auth
+	// Initialize auth handler
 	authHandler := auth.NewHandler(
 		zClient,
 		db,
@@ -40,11 +40,17 @@ func New(cfg *config.Config, client *mongo.Client) *Server {
 
 	r := gin.New()
 
+	// Don't trust any proxy by default (no reverse proxy in front).
+	// If you deploy behind nginx/traefik, set the proxy's IP/CIDR here instead.
+	if err := r.SetTrustedProxies(nil); err != nil {
+		log.Fatalf("failed to set trusted proxies: %v", err)
+	}
+
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     cfg.AllowedOrigins,
+		AllowOrigins:     []string{cfg.FrontendURL},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Session-Id", "X-Session-Token"},
 		ExposeHeaders:    []string{"Content-Length"},
@@ -52,10 +58,10 @@ func New(cfg *config.Config, client *mongo.Client) *Server {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	registerRoutes(r, db, zClient, authHandler)
+	registerRoutes(r, db, authHandler)
 
 	if cfg.ZitadelServiceToken == "" {
-		log.Println("⚠️  ZITADEL_SERVICE_TOKEN no configurado — los endpoints de auth no funcionarán")
+		log.Println("⚠️  ZITADEL_SERVICE_TOKEN not configured — auth endpoints will not work")
 	}
 
 	return &Server{
@@ -65,6 +71,6 @@ func New(cfg *config.Config, client *mongo.Client) *Server {
 }
 
 func (s *Server) Run() error {
-	fmt.Printf("🚀 Servidor iniciando en el puerto: %s\n", s.port)
+	fmt.Printf("🚀 Server starting on port: %s\n", s.port)
 	return s.engine.Run(":" + s.port)
 }

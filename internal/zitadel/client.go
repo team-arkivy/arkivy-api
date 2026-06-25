@@ -10,15 +10,15 @@ import (
 	"time"
 )
 
-// Client es el cliente HTTP para la API v2 de Zitadel
+// Client is the HTTP client for the Zitadel v2 API
 type Client struct {
 	domain     string
-	token      string // PAT o service account token
+	token      string
 	httpClient *http.Client
 	projectID  string
 }
 
-// NewClient crea un nuevo cliente de Zitadel
+// NewClient creates a new Zitadel client
 func NewClient(domain, serviceToken, projectID string) *Client {
 	return &Client{
 		domain:    domain,
@@ -30,21 +30,21 @@ func NewClient(domain, serviceToken, projectID string) *Client {
 	}
 }
 
-// --- Tipos de request/response ---
+// --- Request/Response types ---
 
-// LoginRequest datos que envía Angular
+// LoginRequest data sent by Angular
 type LoginRequest struct {
 	LoginName string `json:"loginName" binding:"required"`
 	Password  string `json:"password" binding:"required"`
 }
 
-// RegisterRequest datos del formulario de sign-up
+// RegisterRequest sign-up form data
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 }
 
-// SessionResponse lo que devolvemos a Angular
+// SessionResponse returned to Angular
 type SessionResponse struct {
 	SessionID    string `json:"sessionId"`
 	SessionToken string `json:"sessionToken"`
@@ -53,7 +53,7 @@ type SessionResponse struct {
 	LoginName    string `json:"loginName,omitempty"`
 }
 
-// SessionInfo información de una sesión activa
+// SessionInfo active session information
 type SessionInfo struct {
 	ID          string         `json:"id"`
 	UserID      string         `json:"userId"`
@@ -78,11 +78,11 @@ type FactorPassword struct {
 	VerifiedAt string `json:"verifiedAt"`
 }
 
-// --- Métodos del cliente ---
+// --- Client methods ---
 
-// Login crea una sesión verificando username + password en dos pasos
+// Login creates a session by verifying username + password in two steps
 func (c *Client) Login(ctx context.Context, loginName, password string) (*SessionResponse, error) {
-	// Paso 1: Crear sesión con check de usuario
+	// Step 1: Create session with user check
 	createBody := map[string]any{
 		"checks": map[string]any{
 			"user": map[string]any{
@@ -93,15 +93,15 @@ func (c *Client) Login(ctx context.Context, loginName, password string) (*Sessio
 
 	createResp, err := c.doRequest(ctx, "POST", "/v2/sessions", createBody)
 	if err != nil {
-		return nil, fmt.Errorf("error creando sesión: %w", err)
+		return nil, fmt.Errorf("error creating session: %w", err)
 	}
 
 	sessionID, ok := createResp["sessionId"].(string)
 	if !ok {
-		return nil, fmt.Errorf("sessionId no encontrado en respuesta")
+		return nil, fmt.Errorf("sessionId not found in response")
 	}
 
-	// Paso 2: Verificar password
+	// Step 2: Verify password
 	updateBody := map[string]any{
 		"checks": map[string]any{
 			"password": map[string]any{
@@ -112,15 +112,15 @@ func (c *Client) Login(ctx context.Context, loginName, password string) (*Sessio
 
 	updateResp, err := c.doRequest(ctx, "PATCH", "/v2/sessions/"+sessionID, updateBody)
 	if err != nil {
-		return nil, fmt.Errorf("contraseña inválida: %w", err)
+		return nil, fmt.Errorf("invalid password: %w", err)
 	}
 
 	sessionToken, _ := updateResp["sessionToken"].(string)
 
-	// Paso 3: Obtener info de la sesión para devolver datos del usuario
+	// Step 3: Get session info to return user data
 	sessionInfo, err := c.GetSession(ctx, sessionID, sessionToken)
 	if err != nil {
-		// La sesión se creó OK, devolvemos sin los datos extra
+		// Session was created OK, return without extra data
 		return &SessionResponse{
 			SessionID:    sessionID,
 			SessionToken: sessionToken,
@@ -136,18 +136,18 @@ func (c *Client) Login(ctx context.Context, loginName, password string) (*Sessio
 	}, nil
 }
 
-// Register crea un usuario y luego inicia sesión
+// Register creates a user and then logs in
 func (c *Client) Register(ctx context.Context, username, password string) (*SessionResponse, string, error) {
-	// Paso 1: Crear usuario en Zitadel
+	// Step 1: Create user in Zitadel
 	userBody := map[string]any{
 		"username": username,
 		"profile": map[string]any{
-			"givenName":  username, // Temporal, el usuario puede cambiarlo después
+			"givenName":  username, // Temporary, user can change it later
 			"familyName": "-",
 		},
 		"email": map[string]any{
 			"email": username,
-			// Cambiar para cuando la verficación por email este listo
+			// Change when email verification is ready
 			"isVerified": true,
 		},
 		"password": map[string]any{
@@ -158,39 +158,39 @@ func (c *Client) Register(ctx context.Context, username, password string) (*Sess
 
 	createResp, err := c.doRequest(ctx, "POST", "/v2/users/human", userBody)
 	if err != nil {
-		return nil, "", fmt.Errorf("error creando usuario: %w", err)
+		return nil, "", fmt.Errorf("error creating user: %w", err)
 	}
 
 	userID, _ := createResp["userId"].(string)
 	if userID == "" {
-		return nil, "", fmt.Errorf("userId no encontrado en respuesta")
+		return nil, "", fmt.Errorf("userId not found in response")
 	}
 
-	// Paso 2: Asignar rol por defecto
+	// Step 2: Assign default role
 	if err := c.AssignRole(ctx, userID, RoleInvited); err != nil {
-		// No es fatal — el usuario se creó, solo no tiene rol aún
-		fmt.Printf("Aviso: no se pudo asignar rol invited al usuario %s: %v\n", userID, err)
+		// Not fatal — user was created, just doesn't have a role yet
+		fmt.Printf("Warning: could not assign invited role to user %s: %v\n", userID, err)
 	}
 
-	// Paso 3: Crear sesión automáticamente
+	// Step 3: Automatically create session
 	session, err := c.Login(ctx, username, password)
 	if err != nil {
-		return nil, userID, fmt.Errorf("usuario creado pero error al iniciar sesión: %w", err)
+		return nil, userID, fmt.Errorf("user created but error logging in: %w", err)
 	}
 
 	return session, userID, nil
 }
 
-// GetSession obtiene la información de una sesión activa
+// GetSession retrieves active session information
 func (c *Client) GetSession(ctx context.Context, sessionID, sessionToken string) (*SessionInfo, error) {
 	resp, err := c.doRequest(ctx, "GET", "/v2/sessions/"+sessionID, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error obteniendo sesión: %w", err)
+		return nil, fmt.Errorf("error retrieving session: %w", err)
 	}
 
 	sessionData, ok := resp["session"].(map[string]any)
 	if !ok {
-		return nil, fmt.Errorf("datos de sesión no encontrados")
+		return nil, fmt.Errorf("session data not found")
 	}
 
 	info := &SessionInfo{
@@ -212,19 +212,19 @@ func (c *Client) GetSession(ctx context.Context, sessionID, sessionToken string)
 	return info, nil
 }
 
-// DeleteSession termina una sesión (logout)
+// DeleteSession terminates a session (logout)
 func (c *Client) DeleteSession(ctx context.Context, sessionID, sessionToken string) error {
 	body := map[string]any{
 		"sessionToken": sessionToken,
 	}
 	_, err := c.doRequest(ctx, "DELETE", "/v2/sessions/"+sessionID, body)
 	if err != nil {
-		return fmt.Errorf("error eliminando sesión: %w", err)
+		return fmt.Errorf("error deleting session: %w", err)
 	}
 	return nil
 }
 
-// AssignRole asigna un rol del proyecto a un usuario
+// AssignRole assigns a project role to a user
 func (c *Client) AssignRole(ctx context.Context, userID string, role Role) error {
 	body := map[string]any{
 		"projectId": c.projectID,
@@ -234,7 +234,7 @@ func (c *Client) AssignRole(ctx context.Context, userID string, role Role) error
 	return err
 }
 
-// GetUserRoles obtiene los roles de un usuario
+// GetUserRoles retrieves a user's roles
 func (c *Client) GetUserRoles(ctx context.Context, userID string) ([]string, error) {
 	body := map[string]any{
 		"queries": []map[string]any{
@@ -274,7 +274,7 @@ func (c *Client) GetUserRoles(ctx context.Context, userID string) ([]string, err
 	return roles, nil
 }
 
-// StartIDPIntent inicia el flujo de login con un IDP externo (Google, GitHub)
+// StartIDPIntent starts the login flow with an external IDP (Google, GitHub)
 func (c *Client) StartIDPIntent(ctx context.Context, idpID, successURL, failureURL string) (string, error) {
 	body := map[string]any{
 		"idpId": idpID,
@@ -286,18 +286,18 @@ func (c *Client) StartIDPIntent(ctx context.Context, idpID, successURL, failureU
 
 	resp, err := c.doRequest(ctx, "POST", "/v2/idp_intents", body)
 	if err != nil {
-		return "", fmt.Errorf("error iniciando IDP intent: %w", err)
+		return "", fmt.Errorf("error starting IDP intent: %w", err)
 	}
 
 	authURL, ok := resp["authorizationUrl"].(string)
 	if !ok {
-		return "", fmt.Errorf("authorizationUrl no encontrada")
+		return "", fmt.Errorf("authorizationUrl not found")
 	}
 
 	return authURL, nil
 }
 
-// CreateSessionWithIDP crea una sesión usando un IDP intent completado
+// CreateSessionWithIDP creates a session using a completed IDP intent
 func (c *Client) CreateSessionWithIDP(ctx context.Context, userID, intentID, intentToken string) (*SessionResponse, error) {
 	body := map[string]any{
 		"checks": map[string]any{
@@ -313,7 +313,7 @@ func (c *Client) CreateSessionWithIDP(ctx context.Context, userID, intentID, int
 
 	resp, err := c.doRequest(ctx, "POST", "/v2/sessions", body)
 	if err != nil {
-		return nil, fmt.Errorf("error creando sesión con IDP: %w", err)
+		return nil, fmt.Errorf("error creating session with IDP: %w", err)
 	}
 
 	sessionID, _ := resp["sessionId"].(string)
@@ -364,14 +364,14 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body any) (
 		return nil, fmt.Errorf("Zitadel API error (%d): %s", resp.StatusCode, string(respBody))
 	}
 
-	// Para DELETE puede devolver body vacío
+	// DELETE may return an empty body
 	if len(respBody) == 0 {
 		return map[string]any{}, nil
 	}
 
 	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return nil, fmt.Errorf("error parseando respuesta: %w", err)
+		return nil, fmt.Errorf("error parsing response: %w", err)
 	}
 
 	return result, nil

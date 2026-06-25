@@ -31,8 +31,8 @@ func NewHandler(zClient *zitadel.Client, db *mongo.Database, googleIDP, githubID
 	}
 }
 
-// syncSysAdminRole verifica si el usuario está en la colección sys_admins
-// y sincroniza el rol en Zitadel
+// syncSysAdminRole checks if the user is in the sys_admins collection
+// and syncs the role in Zitadel
 func (h *Handler) syncSysAdminRole(ctx context.Context, userID, loginName string) {
 	isSysAdmin := h.db.Collection("sys_admins").
 		FindOne(ctx, bson.M{"email": loginName}).Err() == nil
@@ -44,7 +44,7 @@ func (h *Handler) syncSysAdminRole(ctx context.Context, userID, loginName string
 
 	if len(currentRoles) == 0 {
 		if err := h.zClient.AssignRole(ctx, userID, zitadel.RoleInvited); err != nil {
-			fmt.Printf("Error asignando rol invited a %s: %v\n", loginName, err)
+			fmt.Printf("Error assigning invited role to %s: %v\n", loginName, err)
 			return
 		}
 		currentRoles = []string{string(zitadel.RoleInvited)}
@@ -54,7 +54,7 @@ func (h *Handler) syncSysAdminRole(ctx context.Context, userID, loginName string
 
 	if isSysAdmin && !hasSysAdminRole {
 		if err := h.zClient.AssignRole(ctx, userID, zitadel.RoleSysAdmin); err != nil {
-			fmt.Printf("Error asignando sys-admin a %s: %v\n", loginName, err)
+			fmt.Printf("Error assigning sys-admin to %s: %v\n", loginName, err)
 		}
 	}
 }
@@ -68,12 +68,12 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
-// Login maneja POST /auth/login — solo devuelve credenciales de sesión
-// @Summary Login con email/password
+// Login handles POST /auth/login — returns session credentials only
+// @Summary Login with email/password
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param body body zitadel.LoginRequest true "Credenciales"
+// @Param body body zitadel.LoginRequest true "Credentials"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
@@ -81,18 +81,18 @@ func contains(slice []string, item string) bool {
 func (h *Handler) Login(c *gin.Context) {
 	var req zitadel.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos: se requiere loginName y password"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid data: loginName and password are required"})
 		return
 	}
 
 	session, err := h.zClient.Login(c.Request.Context(), req.LoginName, req.Password)
 	if err != nil {
-		log.Printf("[Login] error de Zitadel para %s: %v", req.LoginName, err)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Credenciales inválidas"})
+		log.Printf("[Login] Zitadel error for %s: %v", req.LoginName, err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	// Sincronizar rol sys-admin si aplica (en background, no bloquea la respuesta)
+	// Sync sys-admin role if applicable (in background, does not block the response)
 	if session.UserID != "" {
 		h.syncSysAdminRole(c.Request.Context(), session.UserID, session.LoginName)
 	}
@@ -103,19 +103,19 @@ func (h *Handler) Login(c *gin.Context) {
 	})
 }
 
-// Register maneja POST /auth/register — crea usuario y devuelve credenciales de sesión
-// @Summary Registrar nuevo usuario
+// Register handles POST /auth/register — creates a user and returns session credentials
+// @Summary Register a new user
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param body body zitadel.RegisterRequest true "Datos de registro"
+// @Param body body zitadel.RegisterRequest true "Registration data"
 // @Success 201 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Router /auth/register [post]
 func (h *Handler) Register(c *gin.Context) {
 	var req zitadel.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos inválidos: se requiere username y password"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid data: username and password are required"})
 		return
 	}
 
@@ -125,7 +125,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	// Sincronizar rol sys-admin si aplica
+	// Sync sys-admin role if applicable
 	if userID != "" {
 		h.syncSysAdminRole(c.Request.Context(), userID, req.Username)
 	}
@@ -136,8 +136,8 @@ func (h *Handler) Register(c *gin.Context) {
 	})
 }
 
-// Logout maneja POST /auth/logout
-// @Summary Cerrar sesión
+// Logout handles POST /auth/logout
+// @Summary Log out
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -150,20 +150,20 @@ func (h *Handler) Logout(c *gin.Context) {
 		SessionToken string `json:"sessionToken" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Se requiere sessionId y sessionToken"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "sessionId and sessionToken are required"})
 		return
 	}
 
 	if err := h.zClient.DeleteSession(c.Request.Context(), req.SessionID, req.SessionToken); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Error cerrando sesión"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Error closing session"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Sesión cerrada"})
+	c.JSON(http.StatusOK, gin.H{"message": "Session closed"})
 }
 
-// Me maneja GET /auth/me — devuelve info completa del usuario
-// @Summary Información del usuario actual
+// Me handles GET /auth/me — returns full user info
+// @Summary Current user information
 // @Tags Auth
 // @Produce json
 // @Param X-Session-Id header string true "Session ID"
@@ -176,22 +176,22 @@ func (h *Handler) Me(c *gin.Context) {
 	sessionToken := c.GetHeader("X-Session-Token")
 
 	if sessionID == "" || sessionToken == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesión no proporcionada"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Session not provided"})
 		return
 	}
 
 	info, err := h.zClient.GetSession(c.Request.Context(), sessionID, sessionToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesión inválida o expirada"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired session"})
 		return
 	}
 
 	if info.UserID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Sesión sin usuario verificado"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Session without verified user"})
 		return
 	}
 
-	// Obtener roles del usuario
+	// Get user roles
 	roles, _ := h.zClient.GetUserRoles(c.Request.Context(), info.UserID)
 
 	c.JSON(http.StatusOK, gin.H{
@@ -202,14 +202,14 @@ func (h *Handler) Me(c *gin.Context) {
 	})
 }
 
-// GoogleLogin maneja GET /auth/google
-// @Summary Iniciar login con Google
+// GoogleLogin handles GET /auth/google
+// @Summary Start login with Google
 // @Tags Auth
 // @Produce json
 // @Router /auth/google [get]
 func (h *Handler) GoogleLogin(c *gin.Context) {
 	if h.googleIDP == "" {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "Google login no configurado"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "Google login not configured"})
 		return
 	}
 
@@ -218,21 +218,21 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 
 	authURL, err := h.zClient.StartIDPIntent(c.Request.Context(), h.googleIDP, successURL, failureURL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iniciando login con Google"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error starting login with Google"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"authUrl": authURL})
 }
 
-// GitHubLogin maneja GET /auth/github
-// @Summary Iniciar login con GitHub
+// GitHubLogin handles GET /auth/github
+// @Summary Start login with GitHub
 // @Tags Auth
 // @Produce json
 // @Router /auth/github [get]
 func (h *Handler) GitHubLogin(c *gin.Context) {
 	if h.githubIDP == "" {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitHub login no configurado"})
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitHub login not configured"})
 		return
 	}
 
@@ -241,15 +241,15 @@ func (h *Handler) GitHubLogin(c *gin.Context) {
 
 	authURL, err := h.zClient.StartIDPIntent(c.Request.Context(), h.githubIDP, successURL, failureURL)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error iniciando login con GitHub"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error starting login with GitHub"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"authUrl": authURL})
 }
 
-// IDPCallback maneja POST /auth/idp/callback
-// @Summary Callback de IDP (Google/GitHub)
+// IDPCallback handles POST /auth/idp/callback
+// @Summary IDP callback (Google/GitHub)
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -261,7 +261,7 @@ func (h *Handler) IDPCallback(c *gin.Context) {
 		UserID      string `json:"userId" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Datos de callback inválidos"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid callback data"})
 		return
 	}
 
@@ -272,11 +272,11 @@ func (h *Handler) IDPCallback(c *gin.Context) {
 		req.IntentToken,
 	)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Error completando login con proveedor"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Error completing login with provider"})
 		return
 	}
 
-	// Sincronizar rol sys-admin si aplica
+	// Sync sys-admin role if applicable
 	if session.UserID != "" && session.LoginName != "" {
 		h.syncSysAdminRole(c.Request.Context(), session.UserID, session.LoginName)
 	}

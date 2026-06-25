@@ -1,7 +1,7 @@
 # start-project.ps1
 
 param(
-    [string]$option = "docker"  # "localhost" or "docker"
+    [string]$option = "localhost"  # "localhost" or "docker"
 )
 
 function Write-Done { param([string]$msg) Write-Host $msg -ForegroundColor Yellow }
@@ -57,6 +57,42 @@ function Check-Go {
     }
 }
 
+function Check-Air {
+    if (Get-Command air -ErrorAction SilentlyContinue) {
+        Write-Ok "> Air is installed [DONE]"
+        return
+    }
+    Write-Host "> Air not found. Installing..." -ForegroundColor Cyan
+    go install github.com/air-verse/air@latest
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "> Failed to install Air. Run manually: go install github.com/air-verse/air@latest"
+        exit 1
+    }
+    if (-not (Get-Command air -ErrorAction SilentlyContinue)) {
+        Write-Fail "> Air installed but not found in PATH. Make sure '$(go env GOPATH)\bin' is in your PATH and restart the terminal."
+        exit 1
+    }
+    Write-Ok "> Air installed [DONE]"
+}
+
+function Check-Swag {
+    if (Get-Command swag -ErrorAction SilentlyContinue) {
+        Write-Ok "> Swag is installed [DONE]"
+        return
+    }
+    Write-Host "> Swag not found. Installing..." -ForegroundColor Cyan
+    go install github.com/swaggo/swag/cmd/swag@latest
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "> Failed to install Swag. Run manually: go install github.com/swaggo/swag/cmd/swag@latest"
+        exit 1
+    }
+    if (-not (Get-Command swag -ErrorAction SilentlyContinue)) {
+        Write-Fail "> Swag installed but not found in PATH. Make sure '$(go env GOPATH)\bin' is in your PATH and restart the terminal."
+        exit 1
+    }
+    Write-Ok "> Swag installed [DONE]"
+}
+
 function Import-EnvFile {
     param([string]$envFile)
     if (-not (Test-Path $envFile)) { return }
@@ -78,8 +114,8 @@ Check-Port "mongo" 27017
 
 if ($option -eq "localhost") {
     Check-Go
-
-    Invoke-Step "Generating swagger" { swag init -g cmd/main.go --output docs/ }
+    Check-Air
+    Check-Swag
 
     Write-Host "> Starting MongoDB container..." -ForegroundColor Cyan
     docker compose up mongo -d
@@ -87,14 +123,16 @@ if ($option -eq "localhost") {
     Write-Ok "> MongoDB started [DONE]"
 
     Import-EnvFile ".env"
+    [System.Environment]::SetEnvironmentVariable("MONGO_URI", "mongodb://localhost:27017", "Process")
 
     Write-Host ""
-    Write-Host "Starting API locally..." -ForegroundColor Green
+    Write-Host "Starting API locally with hot-reload (Air)..." -ForegroundColor Green
     Write-Host "   Swagger: http://localhost:9090/swagger/index.html" -ForegroundColor White
+    Write-Host "   Watching for file changes..." -ForegroundColor DarkGray
     Write-Host ""
 
     try {
-        go run ./cmd/main.go
+        air
     } finally {
         Write-Host ""
         Write-Host "Stopping MongoDB container..." -ForegroundColor Yellow
@@ -104,7 +142,7 @@ if ($option -eq "localhost") {
 
 } else {
     try {
-        Invoke-Step "Generating swagger" { swag init -g cmd/main.go --output docs/ }
+        Invoke-Step "Generating swagger" { swag init -g cmd/swagger.go --output docs/ }
         Invoke-Step "Building docker image" { docker compose build }
         Invoke-Step "Starting containers"  { docker compose up -d }
 

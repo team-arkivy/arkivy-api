@@ -8,41 +8,41 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SessionMiddleware valida la sesión del usuario consultando Zitadel
+// SessionMiddleware validates the user session by querying Zitadel
 func SessionMiddleware(zClient *zitadel.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sessionID := c.GetHeader("X-Session-Id")
 		sessionToken := c.GetHeader("X-Session-Token")
 
 		if sessionID == "" || sessionToken == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Sesión no proporcionada"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session not provided"})
 			return
 		}
 
 		info, err := zClient.GetSession(c.Request.Context(), sessionID, sessionToken)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Sesión inválida o expirada"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired session"})
 			return
 		}
 
 		if info.UserID == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Sesión sin usuario verificado"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session without verified user"})
 			return
 		}
 
-		// Verificar que el password fue verificado
+		// Verify that the password was authenticated
 		if info.Factors.Password == nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Autenticación incompleta"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Incomplete authentication"})
 			return
 		}
 
-		// Obtener roles del usuario
+		// Get user roles
 		roles, err := zClient.GetUserRoles(c.Request.Context(), info.UserID)
 		if err != nil {
-			roles = []string{} // Sin roles no es fatal
+			roles = []string{}
 		}
 
-		// Inyectar en el contexto de Gin
+		// Inject into Gin context
 		c.Set("userID", info.UserID)
 		c.Set("loginName", info.LoginName)
 		c.Set("displayName", info.DisplayName)
@@ -51,18 +51,18 @@ func SessionMiddleware(zClient *zitadel.Client) gin.HandlerFunc {
 	}
 }
 
-// RequireRole verifica que el usuario tenga al menos uno de los roles requeridos
+// RequireRole verifies that the user has at least one of the required roles
 func RequireRole(requiredRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userRoles, exists := c.Get("roles")
 		if !exists {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Sin roles asignados"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "No roles assigned"})
 			return
 		}
 
 		roles, ok := userRoles.([]string)
 		if !ok {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Error leyendo roles"})
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Error reading roles"})
 			return
 		}
 
@@ -75,6 +75,6 @@ func RequireRole(requiredRoles ...string) gin.HandlerFunc {
 			}
 		}
 
-		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Acceso denegado: rol insuficiente"})
+		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Access denied: insufficient role"})
 	}
 }

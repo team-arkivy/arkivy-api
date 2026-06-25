@@ -1,0 +1,15 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  pre_cmd = ["swag init -g cmd/swagger.go --output docs/"]
+  cmd = "go build -o ./tmp/main.exe ./cmd/main.go"
+  bin = "./tmp/main.exe"
+  delay = 1000
+  exclude_dir = ["tmp", "docs", "vendor", ".git"]
+  exclude_regex = ["_test\\.go$"]
+  include_ext = ["go", "toml", "yaml", "yml"]
+  kill_delay = 500
+
+[misc]
+  clean_on_exit = true
