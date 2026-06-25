@@ -8,14 +8,6 @@ import (
 	"arkivy-api/internal/server"
 )
 
-// @title           Arkivy API
-// @version         1.0
-// @description     API del proyecto Arkivy
-// @host            localhost:9090
-// @BasePath        /arkivy/v1.0
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
 func main() {
 	cfg := config.Load()
 
@@ -24,6 +16,6 @@ func main() {
 
 	srv := server.New(cfg, client)
 	if err := srv.Run(); err != nil {
-		log.Fatal("Error iniciando el servidor:", err)
+		log.Fatal("Error starting server:", err)
 	}
 }

@@ -10,8 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-// Connect crea un único cliente de MongoDB reutilizable.
-// Devuelve el cliente y una función disconnect para usar con defer en main.
+// Connect creates a single reusable MongoDB client.
+// Returns the client and a disconnect function to use with defer in main.
 func Connect(uri string) (*mongo.Client, func()) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -19,18 +19,18 @@ func Connect(uri string) (*mongo.Client, func()) {
 	opts := options.Client().ApplyURI(uri)
 	client, err := mongo.Connect(opts)
 	if err != nil {
-		log.Fatal("Error al crear cliente MongoDB:", err)
+		log.Fatal("Failed to create MongoDB client:", err)
 	}
 
 	if err := client.Ping(ctx, nil); err != nil {
-		log.Fatal("Error al hacer ping a MongoDB:", err)
+		log.Fatal("Failed to ping MongoDB:", err)
 	}
 
-	fmt.Println("Conectado exitosamente a MongoDB")
+	fmt.Println("Successfully connected to MongoDB")
 
 	disconnect := func() {
 		if err := client.Disconnect(context.Background()); err != nil {
-			log.Println("Error al desconectar MongoDB:", err)
+			log.Println("Failed to disconnect MongoDB:", err)
 		}
 	}
 

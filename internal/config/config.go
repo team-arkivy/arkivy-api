@@ -3,8 +3,14 @@ package config
 import (
 	"log"
 	"os"
+	"sync"
 
 	"github.com/joho/godotenv"
+)
+
+var (
+	instance *Config
+	once     sync.Once
 )
 
 type Config struct {
@@ -15,41 +21,17 @@ type Config struct {
 	MongoURI string
 	MongoDB  string
 
-	// CORS
-	AllowedOrigins []string
-
 	// Zitadel
-	ZitadelDomain       string // https://dev-arkivy-ybl40k.us1.zitadel.cloud
+	ZitadelDomain       string
 	ZitadelClientID     string
 	ZitadelKeyPath      string
-	ZitadelServiceToken string // PAT del service account
+	ZitadelServiceToken string
 	ZitadelProjectID    string
-	ZitadelGoogleIDP    string // ID del IDP de Google en Zitadel (opcional)
-	ZitadelGitHubIDP    string // ID del IDP de GitHub en Zitadel (opcional)
+	ZitadelGoogleIDP    string
+	ZitadelGitHubIDP    string
 
 	// Frontend
 	FrontendURL string
-}
-
-func Load() *Config {
-	if err := godotenv.Load(); err != nil {
-		log.Println("Aviso: no se encontró .env, usando variables de entorno del sistema")
-	}
-
-	return &Config{
-		Port:                getEnv("PORT", "9090"),
-		MongoURI:            getEnv("MONGO_URI", "mongodb://localhost:27017"),
-		MongoDB:             getEnv("MONGO_DB", "arkivy"),
-		AllowedOrigins:      []string{getEnv("FRONTEND_URL", "http://localhost:4200")},
-		ZitadelDomain:       getEnv("ZITADEL_DOMAIN", ""),
-		ZitadelClientID:     getEnv("ZITADEL_CLIENT_ID", ""),
-		ZitadelKeyPath:      getEnv("ZITADEL_KEY_PATH", "key.json"),
-		ZitadelServiceToken: getEnv("ZITADEL_SERVICE_TOKEN", ""),
-		ZitadelProjectID:    getEnv("ZITADEL_PROJECT_ID", ""),
-		ZitadelGoogleIDP:    getEnv("ZITADEL_GOOGLE_IDP", ""),
-		ZitadelGitHubIDP:    getEnv("ZITADEL_GITHUB_IDP", ""),
-		FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:4200"),
-	}
 }
 
 func getEnv(key, fallback string) string {
@@ -57,4 +39,28 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func Load() *Config {
+	once.Do(func() {
+		if err := godotenv.Load(); err != nil {
+			log.Println("Warning: .env file not found, using system environment variables")
+		}
+
+		instance = &Config{
+			Port:                getEnv("PORT", "9090"),
+			MongoURI:            getEnv("MONGO_URI", "mongodb://localhost:27017"),
+			MongoDB:             getEnv("MONGO_DB", "arkivy"),
+			ZitadelDomain:       getEnv("ZITADEL_DOMAIN", ""),
+			ZitadelClientID:     getEnv("ZITADEL_CLIENT_ID", ""),
+			ZitadelKeyPath:      getEnv("ZITADEL_KEY_PATH", "key.json"),
+			ZitadelServiceToken: getEnv("ZITADEL_SERVICE_TOKEN", ""),
+			ZitadelProjectID:    getEnv("ZITADEL_PROJECT_ID", ""),
+			ZitadelGoogleIDP:    getEnv("ZITADEL_GOOGLE_IDP", ""),
+			ZitadelGitHubIDP:    getEnv("ZITADEL_GITHUB_IDP", ""),
+			FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:4200"),
+		}
+	})
+
+	return instance
 }

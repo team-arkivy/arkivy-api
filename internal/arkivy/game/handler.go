@@ -16,7 +16,7 @@ func newHandler(svc GameService) *handler {
 
 // @Summary      Crear un juego
 // @Description  Crea un nuevo juego en la base de datos
-// @Tags         games
+// @Tags         Games
 // @Accept       json
 // @Produce      json
 // @Param        body  body      CreateGameRequest  true  "Datos del juego"
@@ -43,7 +43,7 @@ func (h *handler) create(c *gin.Context) {
 
 // @Summary      Listar juegos
 // @Description  Retorna todos los juegos disponibles
-// @Tags         games
+// @Tags         Games
 // @Produce      json
 // @Success      200  {array}   Game
 // @Failure      500  {object}  map[string]string
