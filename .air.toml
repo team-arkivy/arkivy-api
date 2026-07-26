@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  pre_cmd = ["swag init -g cmd/swagger.go --output docs/"]
+  pre_cmd = ["swag init -g cmd/main.go --output docs/"]
   cmd = "go build -o ./tmp/main.exe ./cmd/main.go"
   bin = "./tmp/main.exe"
   delay = 1000
