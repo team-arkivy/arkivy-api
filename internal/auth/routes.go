@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// RegisterRoutes @Router /arkivy/api/v1.0
 func RegisterRoutes(rg *gin.RouterGroup, h *Handler) {
 	auth := rg.Group("/auth")
 	auth.POST("/login", h.Login)

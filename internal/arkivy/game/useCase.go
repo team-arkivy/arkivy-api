@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"arkivy-api/internal/arkivy/shared"
 )
 
 type gameService struct {
@@ -23,14 +23,14 @@ func (s *gameService) CreateGame(name string, amount int) (*Game, error) {
 		return nil, fmt.Errorf("amount no puede ser negativo")
 	}
 
-	id, err := uuid.NewV7()
+	id, err := shared.NewID()
 	if err != nil {
 		return nil, fmt.Errorf("error al generar UUID: %w", err)
 	}
 
 	now := time.Now().UTC()
 	game := &Game{
-		ID:     id.String(),
+		ID:     id,
 		Name:   name,
 		Amount: amount,
 		CAt:    now,

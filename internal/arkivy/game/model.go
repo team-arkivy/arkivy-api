@@ -1,11 +1,12 @@
 package game
 
 import (
+	"arkivy-api/internal/arkivy/shared"
 	"time"
 )
 
 type Game struct {
-	ID     string    `bson:"_id"  json:"id"     example:"018f1a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b"`
+	ID     shared.ID `bson:"_id"  json:"id"     example:"018f1a2b-3c4d-7e5f-8a9b-0c1d2e3f4a5b"`
 	Name   string    `bson:"name" json:"name"   example:"Chess"`
 	Amount int       `bson:"amount" json:"amount" example:"10"`
 	CAt    time.Time `bson:"c_at" json:"cAt"`

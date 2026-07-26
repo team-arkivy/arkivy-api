@@ -20,7 +20,7 @@ func registerRoutes(r *gin.Engine, db *mongo.Database, authHandler *auth.Handler
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	v1 := r.Group("/arkivy/v1.0")
+	v1 := r.Group("/arkivy/api/v1.0")
 
 	auth.RegisterRoutes(v1, authHandler)
 	game.RegisterRoutes(v1, db)
