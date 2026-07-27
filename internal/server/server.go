@@ -11,6 +11,10 @@ import (
 
 	"arkivy-api/internal/auth"
 	"arkivy-api/internal/config"
+	"arkivy-api/internal/content"
+	"arkivy-api/internal/devauth"
+	"arkivy-api/internal/groups"
+	"arkivy-api/internal/organizations"
 	"arkivy-api/internal/zitadel"
 )
 
@@ -36,7 +40,13 @@ func New(cfg *config.Config, client *mongo.Client) *Server {
 		cfg.ZitadelGoogleIDP,
 		cfg.ZitadelGitHubIDP,
 		cfg.FrontendURL,
+		cfg.DevAuthBypass,
+		devauth.UserID,
 	)
+
+	groupsHandler := groups.NewHandler(db)
+	contentHandler := content.NewHandler(db)
+	organizationsHandler := organizations.NewHandler(db)
 
 	r := gin.New()
 
@@ -58,7 +68,7 @@ func New(cfg *config.Config, client *mongo.Client) *Server {
 		MaxAge:           12 * time.Hour,
 	}))
 
-	registerRoutes(r, db, authHandler)
+	registerRoutes(r, db, zClient, authHandler, groupsHandler, contentHandler, organizationsHandler, cfg.DevAuthBypass)
 
 	if cfg.ZitadelServiceToken == "" {
 		log.Println("⚠️  ZITADEL_SERVICE_TOKEN not configured — auth endpoints will not work")

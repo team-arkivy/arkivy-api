@@ -32,6 +32,11 @@ type Config struct {
 
 	// Frontend
 	FrontendURL string
+
+	// DevAuthBypass, when true, makes SessionMiddleware skip Zitadel session
+	// validation and authenticate every request as a fixed local dev user
+	// (see internal/devauth). Never enable outside a developer's own machine.
+	DevAuthBypass bool
 }
 
 func getEnv(key, fallback string) string {
@@ -59,6 +64,7 @@ func Load() *Config {
 			ZitadelGoogleIDP:    getEnv("ZITADEL_GOOGLE_IDP", ""),
 			ZitadelGitHubIDP:    getEnv("ZITADEL_GITHUB_IDP", ""),
 			FrontendURL:         getEnv("FRONTEND_URL", "http://localhost:4200"),
+			DevAuthBypass:       getEnv("DEV_AUTH_BYPASS", "false") == "true",
 		}
 	})
 

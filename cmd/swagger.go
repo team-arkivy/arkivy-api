@@ -4,12 +4,19 @@ package main
 // @version         1.0
 // @description     API del proyecto Arkivy
 // @host            localhost:9090
-// @BasePath        /arkivy-api
+// @BasePath        /arkivy/v1.0
 //
 // @tag.name Auth
 // @tag.description Authentication endpoints
-// @tag.name Games
-// @tag.description Game endpoints (just as an example)
+//
+// @tag.name Groups
+// @tag.description Groups & RBAC endpoints
+//
+// @tag.name Content
+// @tag.description Spaces, Pages, Blocks & Attachments endpoints
+//
+// @tag.name Organizations
+// @tag.description Organization directory endpoints
 //
 // @securityDefinitions.apikey BearerAuth
 // 	@in header

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"arkivy-api/internal/organizations"
 	"arkivy-api/internal/zitadel"
 
 	"github.com/gin-gonic/gin"
@@ -19,15 +20,23 @@ type Handler struct {
 	googleIDP string
 	githubIDP string
 	frontURL  string
+
+	// devBypass/devUserID mirror internal/middleware.SessionMiddleware's dev
+	// bypass (config.DevAuthBypass, see internal/devauth) — Me doesn't run
+	// behind that middleware, so it needs to know about the bypass itself.
+	devBypass bool
+	devUserID string
 }
 
-func NewHandler(zClient *zitadel.Client, db *mongo.Database, googleIDP, githubIDP, frontURL string) *Handler {
+func NewHandler(zClient *zitadel.Client, db *mongo.Database, googleIDP, githubIDP, frontURL string, devBypass bool, devUserID string) *Handler {
 	return &Handler{
 		zClient:   zClient,
 		db:        db,
 		googleIDP: googleIDP,
 		githubIDP: githubIDP,
 		frontURL:  frontURL,
+		devBypass: devBypass,
+		devUserID: devUserID,
 	}
 }
 
@@ -56,6 +65,18 @@ func (h *Handler) syncSysAdminRole(ctx context.Context, userID, loginName string
 		if err := h.zClient.AssignRole(ctx, userID, zitadel.RoleSysAdmin); err != nil {
 			fmt.Printf("Error assigning sys-admin to %s: %v\n", loginName, err)
 		}
+	}
+}
+
+// ensureOrganization makes sure userID has a personal organization in Mongo
+// (RF-AUTH-02), creating one on first sight. Safe to call on every
+// login/register/idp-callback — a no-op once it already exists.
+func (h *Handler) ensureOrganization(ctx context.Context, userID, email, displayName string) {
+	if userID == "" {
+		return
+	}
+	if _, err := organizations.EnsurePersonalOrganization(ctx, h.db, userID, email, displayName); err != nil {
+		fmt.Printf("Error ensuring personal organization for %s: %v\n", email, err)
 	}
 }
 
@@ -95,6 +116,7 @@ func (h *Handler) Login(c *gin.Context) {
 	// Sync sys-admin role if applicable (in background, does not block the response)
 	if session.UserID != "" {
 		h.syncSysAdminRole(c.Request.Context(), session.UserID, session.LoginName)
+		h.ensureOrganization(c.Request.Context(), session.UserID, session.LoginName, session.DisplayName)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -128,6 +150,7 @@ func (h *Handler) Register(c *gin.Context) {
 	// Sync sys-admin role if applicable
 	if userID != "" {
 		h.syncSysAdminRole(c.Request.Context(), userID, req.Username)
+		h.ensureOrganization(c.Request.Context(), userID, req.Username, session.DisplayName)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
@@ -180,26 +203,47 @@ func (h *Handler) Me(c *gin.Context) {
 		return
 	}
 
-	info, err := h.zClient.GetSession(c.Request.Context(), sessionID, sessionToken)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired session"})
-		return
+	var userID, loginName, displayName string
+	var roles []string
+
+	if h.devBypass {
+		userID = h.devUserID
+		loginName = "dev@arkivy.local"
+		displayName = "Dev User"
+		roles = []string{}
+	} else {
+		info, err := h.zClient.GetSession(c.Request.Context(), sessionID, sessionToken)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired session"})
+			return
+		}
+		if info.UserID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Session without verified user"})
+			return
+		}
+		userID = info.UserID
+		loginName = info.LoginName
+		displayName = info.DisplayName
+		roles, _ = h.zClient.GetUserRoles(c.Request.Context(), info.UserID)
 	}
 
-	if info.UserID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Session without verified user"})
-		return
-	}
-
-	// Get user roles
-	roles, _ := h.zClient.GetUserRoles(c.Request.Context(), info.UserID)
-
-	c.JSON(http.StatusOK, gin.H{
-		"userId":      info.UserID,
-		"loginName":   info.LoginName,
-		"displayName": info.DisplayName,
+	resp := gin.H{
+		"userId":      userID,
+		"loginName":   loginName,
+		"displayName": displayName,
 		"roles":       roles,
-	})
+	}
+
+	if user, org, err := organizations.GetUserWithOrganization(c.Request.Context(), h.db, userID); err == nil {
+		resp["organizationId"] = user.OrganizationID
+		resp["isPlatformAdmin"] = user.IsPlatformAdmin
+		if org != nil {
+			resp["organizationName"] = org.Name
+			resp["planId"] = org.PlanID
+		}
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // GoogleLogin handles GET /auth/google
@@ -276,10 +320,18 @@ func (h *Handler) IDPCallback(c *gin.Context) {
 		return
 	}
 
+	// CreateSessionWithIDP doesn't return loginName/displayName — fetch them
+	// so sys-admin sync and organization creation below have an email to use.
+	if info, err := h.zClient.GetSession(c.Request.Context(), session.SessionID, session.SessionToken); err == nil {
+		session.LoginName = info.LoginName
+		session.DisplayName = info.DisplayName
+	}
+
 	// Sync sys-admin role if applicable
 	if session.UserID != "" && session.LoginName != "" {
 		h.syncSysAdminRole(c.Request.Context(), session.UserID, session.LoginName)
 	}
+	h.ensureOrganization(c.Request.Context(), session.UserID, session.LoginName, session.DisplayName)
 
 	c.JSON(http.StatusOK, gin.H{
 		"sessionId":    session.SessionID,
