@@ -142,7 +142,7 @@ if ($option -eq "localhost") {
 
 } else {
     try {
-        Invoke-Step "Generating swagger" { swag init -g cmd/swagger.go --output docs/ }
+        Invoke-Step "Generating swagger" { swag init -g cmd/main.go --output docs/ }
         Invoke-Step "Building docker image" { docker compose build }
         Invoke-Step "Starting containers"  { docker compose up -d }
 

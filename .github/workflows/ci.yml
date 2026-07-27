@@ -22,7 +22,7 @@ jobs:
         run: go install github.com/swaggo/swag/cmd/swag@latest
 
       - name: Generate swagger docs
-        run: swag init -g cmd/swagger.go --output docs/
+        run: swag init -g cmd/main.go --output docs/
 
       - name: Verify dependencies
         run: go mod verify

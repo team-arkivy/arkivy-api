@@ -25,7 +25,7 @@ func registerRoutes(r *gin.Engine, db *mongo.Database, zClient *zitadel.Client, 
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	v1 := r.Group("/arkivy/v1.0")
+	v1 := r.Group("/arkivy/api/v1.0")
 
 	auth.RegisterRoutes(v1, authHandler)
 
