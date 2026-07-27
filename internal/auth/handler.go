@@ -77,7 +77,7 @@ func contains(slice []string, item string) bool {
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
-// @Router /auth/login [post]
+// @Router /arkivy/api/v1.0/auth/login [post]
 func (h *Handler) Login(c *gin.Context) {
 	var req zitadel.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -111,7 +111,7 @@ func (h *Handler) Login(c *gin.Context) {
 // @Param body body zitadel.RegisterRequest true "Registration data"
 // @Success 201 {object} map[string]string
 // @Failure 400 {object} map[string]string
-// @Router /auth/register [post]
+// @Router /arkivy/api/v1.0/auth/register [post]
 func (h *Handler) Register(c *gin.Context) {
 	var req zitadel.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -143,7 +143,7 @@ func (h *Handler) Register(c *gin.Context) {
 // @Produce json
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
-// @Router /auth/logout [post]
+// @Router /arkivy/api/v1.0/auth/logout [post]
 func (h *Handler) Logout(c *gin.Context) {
 	var req struct {
 		SessionID    string `json:"sessionId" binding:"required"`
@@ -170,7 +170,7 @@ func (h *Handler) Logout(c *gin.Context) {
 // @Param X-Session-Token header string true "Session Token"
 // @Success 200 {object} map[string]any
 // @Failure 401 {object} map[string]string
-// @Router /auth/me [get]
+// @Router /arkivy/api/v1.0/auth/me [get]
 func (h *Handler) Me(c *gin.Context) {
 	sessionID := c.GetHeader("X-Session-Id")
 	sessionToken := c.GetHeader("X-Session-Token")
@@ -206,7 +206,7 @@ func (h *Handler) Me(c *gin.Context) {
 // @Summary Start login with Google
 // @Tags Auth
 // @Produce json
-// @Router /auth/google [get]
+// @Router /arkivy/api/v1.0/auth/google [get]
 func (h *Handler) GoogleLogin(c *gin.Context) {
 	if h.googleIDP == "" {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "Google login not configured"})
@@ -229,7 +229,7 @@ func (h *Handler) GoogleLogin(c *gin.Context) {
 // @Summary Start login with GitHub
 // @Tags Auth
 // @Produce json
-// @Router /auth/github [get]
+// @Router /arkivy/api/v1.0/auth/github [get]
 func (h *Handler) GitHubLogin(c *gin.Context) {
 	if h.githubIDP == "" {
 		c.JSON(http.StatusNotImplemented, gin.H{"error": "GitHub login not configured"})
@@ -253,7 +253,7 @@ func (h *Handler) GitHubLogin(c *gin.Context) {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Router /auth/idp/callback [post]
+// @Router /arkivy/api/v1.0/auth/idp/callback [post]
 func (h *Handler) IDPCallback(c *gin.Context) {
 	var req struct {
 		IntentID    string `json:"intentId" binding:"required"`
