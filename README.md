@@ -1,6 +1,6 @@
 # Arkivy API
 
-This is the back-end of the project arkivy
+This is the back-end of the project arkivy. It implements the **Org & Billing** module described in [`../docs/ARCHITECTURE.md`](../docs/ARCHITECTURE.md) — currently just authentication/users via Zitadel; the rest of that module (organizations, plans, groups) and the other modules (Content, Activity & Analytics, Ingest) are not implemented yet.
 
 ## Tech Stack
 
@@ -19,6 +19,14 @@ This is the back-end of the project arkivy
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
+
+## Environment variables
+
+Copy `.env.example` to `.env` and fill in the real values (Zitadel domain, service token, etc.) before starting the project. `.env` is git-ignored on purpose — it holds secrets.
+
+```powershell
+Copy-Item .env.example .env
+```
 
 ## Getting Started
 

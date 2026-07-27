@@ -8,14 +8,27 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SessionMiddleware validates the user session by querying Zitadel
-func SessionMiddleware(zClient *zitadel.Client) gin.HandlerFunc {
+// SessionMiddleware validates the user session by querying Zitadel. When
+// devBypass is true (config.DevAuthBypass, see internal/devauth), it skips
+// Zitadel entirely and authenticates every request as the fixed local dev
+// user instead — only ever meant for a developer's own machine while real
+// Zitadel credentials aren't available yet.
+func SessionMiddleware(zClient *zitadel.Client, devBypass bool, devUserID string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sessionID := c.GetHeader("X-Session-Id")
 		sessionToken := c.GetHeader("X-Session-Token")
 
 		if sessionID == "" || sessionToken == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Session not provided"})
+			return
+		}
+
+		if devBypass {
+			c.Set("userID", devUserID)
+			c.Set("loginName", "dev@arkivy.local")
+			c.Set("displayName", "Dev User")
+			c.Set("roles", []string{})
+			c.Next()
 			return
 		}
 
